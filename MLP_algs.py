@@ -2,6 +2,8 @@ import torch
 from torch import nn
 import numpy as np
 from typing import List
+
+# Base NN Class
 class MLP(nn.Module):
     def __init__(self, input_size: int, hidden_size: List[int]):
         super().__init__()
@@ -17,11 +19,15 @@ class MLP(nn.Module):
     def forward(self, x):
         return self.layers(x)
 
+
+
 class MLP_actor(nn.Module):
     def __init__(self, config):
         super().__init__()
         self.device =                       config["device"]
-        self.n_agents =                     config["n_agents"]
+        self.n_multirotor =                 config["n_holonomic"]
+        self.n_fixedwing =                  config["n_fixedwing"]
+        self.n_agents = self.n_multirotor + self.n_fixedwing
         self.observation_dim_per_agent =    config["observation_dim_per_agent"]
         self.action_dim_per_agent =         config["action_dim_per_agent"]
         self.r_communication =              config["r_communication"]
