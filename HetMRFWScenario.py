@@ -1,5 +1,5 @@
 import torch
-from torch import Tensor
+import random
 
 from vmas.simulator.core import Agent, Box, Landmark, Sphere, World
 from vmas.simulator.dynamics.holonomic import Holonomic  # Multirotor
@@ -33,7 +33,7 @@ class HetMRFWScenario(BaseScenario):
 
         # agent attr and sensors
         self.agent_radius = kwargs.pop("agent_radius", 0.1)
-        view_area = (self.world_spawning_x * self.world_spawning_y) / 4
+        view_area = (2 * self.world_spawning_x * 2 * self.world_spawning_y) / 4
         self.lidar_range = kwargs.pop("lidar_range", ((view_area) / torch.pi) ** (1 / 2))
         self.n_lidar_rays = kwargs.pop("n_lidar_rays", 8)
         self.min_distance_between_entities = kwargs.pop("min_distance_between_entities", self.agent_radius * 2 + 0.05)
@@ -59,50 +59,47 @@ class HetMRFWScenario(BaseScenario):
         world = World(batch_dim=batch_dim, device=device)
 
         self.goals = []
+        self.colors = [
+            Color.RED,
+            Color.ORANGE,
+            Color.YELLOW,
+            Color.GREEN,
+            Color.BLUE,
+            Color.PURPLE,
+            Color.LIGHT_GREEN
+        ]
         # Add agents and landmarks to environment
         for i in range(self.n_agents):
+            color = self.colors[i] if i < self.n_agents else torch.randn(3, device=device)
+            sensors = [
+                Lidar(
+                    world,
+                    n_rays=self.n_lidar_rays,
+                    max_range=self.lidar_range,
+                    entity_filter=lambda e: e in self.goals,
+                    angle_start=0.0,
+                    angle_end=2 * torch.pi,
+                )
+            ]  # LIDAR sensor
             if (i < self.n_multirotor):
                 agent = Agent(
-                    name=f"multirotor_{i}",
+                    name=f"multirotor {i}",
                     collide=True,
                     shape=Sphere(radius=self.agent_radius),
-                    color=Color.RED,
+                    color=color,
                     dynamics=Holonomic(),
                     render_action=self.render_action,
                     u_range=[1, 1],
-                    sensors=[
-                        Lidar(
-                            world,
-                            n_rays=self.n_lidar_rays,
-                            max_range=self.lidar_range,
-                            entity_filter=lambda e: isinstance(
-                                e, Agent
-                            ),
-                            angle_start=0.0,
-                            angle_end=2 * torch.pi,
-                        )
-                    ]  # LIDAR sensor TODO: Change this to None
+                    sensors=None
                 )
             else:
                 max_steering_angle = torch.pi / 4
-                sensors = [
-                    Lidar(
-                        world,
-                        n_rays=self.n_lidar_rays,
-                        max_range=self.lidar_range,
-                        entity_filter=lambda e: isinstance(
-                            e, Agent
-                        ),
-                        angle_start=0.0,
-                        angle_end=2 * torch.pi,
-                    )
-                ]  # LIDAR sensor
 
                 agent = Agent(
-                    name=f"fixedwing_{i - self.n_multirotor}",
+                    name=f"fixedwing {i - self.n_multirotor}",
                     collide=True,
                     shape=Box(length=self.agent_radius * 2, width=self.agent_radius),
-                    color=Color.ORANGE,
+                    color=color,
                     sensors=sensors,
                     u_range=[1, max_steering_angle],
                     render_action=self.render_action,
@@ -124,8 +121,8 @@ class HetMRFWScenario(BaseScenario):
             # add landmarks
             goal = Landmark(
                 name=f"landmark_{i}",
-                collide=False,
-                color=Color.GREEN
+                collide=True,
+                color=color
             )
             world.add_landmark(goal)
             self.goals.append(goal)
